@@ -12,6 +12,8 @@ import (
 var noopPresets = make(map[string]string)
 
 func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expectedValue string) {
+	t.Helper()
+
 	key, value, _ := parseLine(rawEnvLine, noopPresets)
 	if key != expectedKey || value != expectedValue {
 		t.Errorf("Expected '%v' to parse as '%v' => '%v', got '%v' => '%v' instead", rawEnvLine, expectedKey, expectedValue, key, value)
@@ -366,6 +368,22 @@ func TestParsing(t *testing.T) {
 	parseAndCompare(t, " KEY =value", "KEY", "value")
 	parseAndCompare(t, "   KEY=value", "KEY", "value")
 	parseAndCompare(t, "\tKEY=value", "KEY", "value")
+
+	t.Run("parse multiline variables", func(t *testing.T) {
+		singleQuoted := `FOO='foo
+bar
+baz'`
+		doubleQuoted := `FOO="foo
+bar
+baz"`
+
+		expected := `foo
+bar
+baz`
+
+		parseAndCompare(t, singleQuoted, "FOO", expected)
+		parseAndCompare(t, doubleQuoted, "FOO", expected)
+	})
 
 	// it 'throws an error if line format is incorrect' do
 	// expect{env('lol$wut')}.to raise_error(Dotenv::FormatError)

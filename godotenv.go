@@ -109,6 +109,8 @@ func Parse(r io.Reader) (envMap map[string]string, err error) {
 		return
 	}
 
+	lines = restoreMultilineVariables(lines)
+
 	for _, fullLine := range lines {
 		if !isIgnoredLine(fullLine) {
 			var key, value string
@@ -273,8 +275,8 @@ func parseLine(line string, envMap map[string]string) (key string, value string,
 }
 
 var (
-	singleQuotesRegex  = regexp.MustCompile(`\A'(.*)'\z`)
-	doubleQuotesRegex  = regexp.MustCompile(`\A"(.*)"\z`)
+	singleQuotesRegex  = regexp.MustCompile(`\A'([^']|\'|\n)*'\z`)
+	doubleQuotesRegex  = regexp.MustCompile(`\A"([^"]|\"|\n)*"\z`)
 	escapeRegex        = regexp.MustCompile(`\\.`)
 	unescapeCharsRegex = regexp.MustCompile(`\\([^$])`)
 )
@@ -355,4 +357,33 @@ func doubleQuoteEscape(line string) string {
 		line = strings.Replace(line, string(c), toReplace, -1)
 	}
 	return line
+}
+
+func restoreMultilineVariables(lines []string) []string {
+	var joinedLines []string
+	var startIdx = -1
+	for li, line := range lines {
+		if startIdx >= 0 {
+			// we are in multiline var context
+			if strings.HasSuffix(line, "'") {
+				joinedLines = append(joinedLines, strings.Join(lines[startIdx:li+1], "\n"))
+				startIdx = -1
+				continue
+			} else if li != len(lines)+1 {
+				// this line is not last and it does not end with ' so it is multiline string
+				continue
+			}
+		} else if i, j := strings.Index(line, "="), strings.Index(line, "='"); j >= 0 && j == i {
+			// we have start of possibly multiline string
+			if !strings.HasSuffix(line, "'") && li != len(lines)+1 {
+				// this line is not last and it does not end with '
+				// so it is BEGINNING of multiline string
+				startIdx = li
+				continue
+			}
+		}
+
+		joinedLines = append(joinedLines, line)
+	}
+	return joinedLines
 }
